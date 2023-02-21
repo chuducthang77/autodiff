@@ -5,8 +5,6 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 
-from torchviz import make_dot
-
 def cases_1():
     # Both x and y are vectors
     x = torch.tensor([1., 2.], requires_grad=True)
@@ -148,10 +146,8 @@ def cases_4():
     # print('dydx: ', dydx)
 
 def cases_5():
-    # Both x and y are vectors
-    # Test the retained graph
-    # Second derivative
-
+    # Both x and y are vectors,
+    # Test whether backward and grad are equivalent
     x = torch.tensor([1., 2.], requires_grad=True)
 
     y = torch.empty(3)
@@ -160,34 +156,32 @@ def cases_5():
     y[2] = 3 * x[1]
 
     v = torch.tensor([1.0, 2.0, 3.0])
-    y.backward(v)  # VJP.
+    y.backward(v, retain_graph=True)  # VJP. #If retain_graph is not True, the result will be different
+    print('x.grad: ', x.grad)
 
-    print("y:", y)
-    print("x.grad:", x.grad)
-
-
-    # z = y[0] + 2 * y[1] + 3 * y[2] # These are equivalent to the above cases
-    # z.backward() # Backward is implicit used for dim = 1
-    # print('z:', z)
-    # print('x.grad', x.grad)
-
-    # Manual computation.
-    # [
-    #   [2, 0],
-    #   [2, 20],
-    #   [0, 3]
-    # ]
-    # dydx = torch.tensor(
-    #     [
-    #         [2 * x[0], 0],
-    #         [2 * x[0], 10 * x[1]],
-    #         [0, 3],
-    #     ]
-    # )
-    #
-    # assert torch.equal(x.grad, v @ dydx)
+    dydx = grad(y, x, grad_outputs=v)
+    print('dydx: ', dydx)
 
 def cases_6():
+    # Both x and y are vectors,
+    # Test whether backward and grad are equivalent
+    x = torch.tensor([1., 2.], requires_grad=True)
+
+    y = torch.empty(3)
+    y[0] = x[0] ** 2
+    y[1] = x[0] ** 2 + 5 * x[1] ** 2
+    y[2] = 3 * x[1]
+
+    v = torch.tensor([1.0, 2.0, 3.0])
+    y.backward(v, retain_graph=True)  # VJP. #If retain_graph is False, there will be an error
+    print('x.grad: ', x.grad)
+    y.backward(v, retain_graph=True)
+    print('x.grad: ', x.grad) # second derivative
+
+    dydx = grad(y, x, grad_outputs=v) # Has the output of the second derivative
+    print('dydx: ', dydx)
+
+def cases_7():
     # Both x and y are vectors
     # Test the behavior of more than 2 layers
     x = torch.tensor([1., 2.], requires_grad=True)
@@ -198,33 +192,19 @@ def cases_6():
     y[2] = 3 * x[1]
 
     v = torch.tensor([1.0, 2.0, 3.0])
-    y.backward(v)  # VJP.
+    # If create_graph is False, there will be an error
+    # But there is a warning that using create_graph in backward will create a reference cycle
+    # and cause a memory leak
+    y.backward(v, create_graph=True)  # VJP.
+    print('x.grad: ', x.grad)
+    # If create_graph is False, there will be an error if we try to use grad
+    y.backward(v, create_graph=True)
+    print('x.grad: ', x.grad)
 
-    print("y:", y)
-    print("x.grad:", x.grad)
+    dydx = grad(y, x, grad_outputs=v)  # Has the output of the second derivative
+    print('dydx: ', dydx)
 
-    # z = y[0] + 2 * y[1] + 3 * y[2] # These are equivalent to the above cases
-    # z.backward() # Backward is implicit used for dim = 1
-    # print('z:', z)
-    # print('x.grad', x.grad)
-
-    # Manual computation.
-    # [
-    #   [2, 0],
-    #   [2, 20],
-    #   [0, 3]
-    # ]
-    dydx = torch.tensor(
-        [
-            [2 * x[0], 0],
-            [2 * x[0], 10 * x[1]],
-            [0, 3],
-        ]
-    )
-
-    assert torch.equal(x.grad, v @ dydx)
-
-def cases_7():
+def cases_8():
     # Both x and y are vectors
     x = torch.tensor([1., 2.], requires_grad=True)
 
@@ -264,4 +244,5 @@ def cases_7():
 # cases_2()
 # cases_3()
 # cases_4()
-cases_5()
+# cases_5()
+cases_6()

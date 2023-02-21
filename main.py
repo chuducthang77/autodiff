@@ -125,7 +125,7 @@ def cases_3():
             [1., 3., 2.],
             [1., 1., 1.]
         ]
-    ) # v has to have the same dimension as x
+    ) # v has to have the same dimension as y
     y.backward(v)
 
 def cases_4():
@@ -183,7 +183,6 @@ def cases_6():
 
 def cases_7():
     # Both x and y are vectors
-    # Test the behavior of more than 2 layers
     x = torch.tensor([1., 2.], requires_grad=True)
 
     y = torch.empty(3)
@@ -205,44 +204,76 @@ def cases_7():
     print('dydx: ', dydx)
 
 def cases_8():
-    # Both x and y are vectors
+    # Both x, y, and z are vectors
+    # Test with more than 2 layers
+    # To understand the leaf nodes vs non-leaf nodes
     x = torch.tensor([1., 2.], requires_grad=True)
 
-    y = torch.empty(3)
+    y = torch.empty(3) # Note that set up requires_grad to be True will cause error later (in-place operator only)
     y[0] = x[0] ** 2
     y[1] = x[0] ** 2 + 5 * x[1] ** 2
     y[2] = 3 * x[1]
+    y.retain_grad() # Must use on the non-leaf grad
 
-    v = torch.tensor([1.0, 2.0, 3.0])
-    y.backward(v)  # VJP.
+    # y = torch.tensor([
+    #     x[0] ** 2,
+    #     x[0] ** 2 + 5 * x[1] ** 2,
+    #     3 * x[1]
+    # ], requires_grad=True)  # Note that set-up like this will stop the backprop at y
 
-    print("y:", y)
-    print("x.grad:", x.grad)
 
-    # z = y[0] + 2 * y[1] + 3 * y[2] # These are equivalent to the above cases
-    # z.backward() # Backward is implicit used for dim = 1
-    # print('z:', z)
-    # print('x.grad', x.grad)
+    z = torch.empty(4)
+    z[0] = y[0] * y[2]
+    z[1] = y[1] ** 2 + 5
+    z[2] = y[0] * y[1]
+    z[3] = y[2] + 1
 
-    # Manual computation.
+
+    # u = torch.tensor([1., 2., 3., 4.])
+    # dzdy = grad(z, y, grad_outputs=u, retain_graph=True)
+    # print("y.grad: ", dzdy)
+    # dzdx = grad(z, x, grad_outputs=u, retain_graph=True)
+    # print("x.grad: ", dzdx)
+
+    # z.backward(u)
+    # print('x.grad: ', x.grad)
+    # print('y.grad: ', y.grad)
+
+    a = z[0] + 2 * z[1] + 3 * z[2] + 4 * z[3]# These are equivalent to the above cases
+    a.backward() # Backward is implicit used for dim = 1
+    print('a:', a)
+    print('x.grad', x.grad)
+    print('y.grad', y.grad)
+
+    # TODO: Manual computation.
     # [
     #   [2, 0],
     #   [2, 20],
     #   [0, 3]
     # ]
-    dydx = torch.tensor(
-        [
-            [2 * x[0], 0],
-            [2 * x[0], 10 * x[1]],
-            [0, 3],
-        ]
-    )
+    # dydx = torch.tensor(
+    #     [
+    #         [2 * x[0], 0],
+    #         [2 * x[0], 10 * x[1]],
+    #         [0, 3],
+    #     ]
+    # )
+    #
+    # assert torch.equal(x.grad, v @ dydx)
 
-    assert torch.equal(x.grad, v @ dydx)
+def cases_9():
+    # Allow unused cases
+    pass
+
+def cases_10():
+    # Special function form
+    pass
 
 # cases_1()
 # cases_2()
 # cases_3()
 # cases_4()
 # cases_5()
-cases_6()
+# cases_6()
+# cases_7()
+cases_8()
